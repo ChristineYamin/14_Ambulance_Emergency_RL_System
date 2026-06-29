@@ -1,6 +1,10 @@
 # Ignore the large data and model files
 data/NYC.csv
 model/model.pkl
+notebooks/fitness_history.csv
+notebooks/locations.csv
+notebooks/optimized_supply_route.csv
+
 
 # You can also add these common folders that don't need to be on GitHub
 __pycache__/
