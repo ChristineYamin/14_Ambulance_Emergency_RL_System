@@ -5,6 +5,7 @@ import folium
 
 from streamlit_folium import st_folium
 from styles import load_css
+
 # -----------------------------------
 # Page Configuration
 # -----------------------------------
@@ -15,7 +16,62 @@ st.set_page_config(
     layout="wide"
 )
 
+#----------------------------------------
 # CSS
+#----------------------------------------
+def load_css():
+    return """
+    <style>
+    /* 1. Base Dark Theme */
+    [data-testid="stAppViewContainer"], [data-testid="stSidebar"], [data-testid="stHeader"] {
+        background-color: #0E1117 !important;
+        color: #E0E0E0 !important;
+    }
+
+    /* 2. Text Elements */
+    h1, h2, h3, p { color: #FFFFFF !important; }
+    h2 { color: #00E5FF !important; } /* Accent color for headers */
+
+    /* 3. Metric Cards */
+    div[data-testid="metric-container"] {
+        background: #161B22 !important; /* Slightly lighter than background */
+        border-radius: 12px !important;
+        padding: 20px !important;
+        border: 1px solid #30363D !important;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.3) !important;
+    }
+
+    /* 4. Sidebar Button */
+    div.stButton > button {
+        background-color: #00E5FF !important;
+        color: #0E1117 !important;
+        font-weight: bold !important;
+        border: none !important;
+        border-radius: 8px !important;
+    }
+
+    /* 5. Tables - Making them 'Professional' */
+    [data-testid="stDataFrame"] {
+        border: 1px solid #00E5FF !important;
+    }
+
+    /* This targets the column headers of the dataframe */
+    [data-testid="stDataFrame"] div[role="columnheader"] {
+        background-color: #1F2937 !important;
+        color: #00E5FF !important;
+        border-bottom: 2px solid #00E5FF !important;
+    }
+
+    /* Target dataframe cells for consistent text color */
+    [data-testid="stDataFrame"] td {
+        color: #E0E0E0 !important;
+        background-color: #161B22 !important;
+    }
+    </style>
+
+   
+    """
+
 st.markdown(load_css(), unsafe_allow_html=True)
 
 # -----------------------------------
@@ -142,28 +198,36 @@ st.info(route_text)
 # -----------------------------------
 
 st.subheader("📈 Genetic Algorithm Performance")
+# Set the style to dark
+plt.style.use('dark_background')
 
 fig, ax = plt.subplots(
     figsize=(10, 4)
 )
 
+# Transparent background for the figure and axes
+fig.patch.set_facecolor('#0E1117')
+ax.set_facecolor('#1F2937')
+
 ax.plot(
     history_df["Generation"],
     history_df["Score"],
+    color="#00E5FF",
     linewidth=3
 )
 
-ax.set_title(
-    "Fitness Score Across Generations"
-)
+# Style titles and labels
+ax.set_title("Fitness Score Across Generations", color='white')
+ax.set_xlabel("Generation", color='white')
+ax.set_ylabel("Predicted Travel Time", color='white')
 
-ax.set_xlabel(
-    "Generation"
-)
+# Adjust tick colors
+ax.tick_params(axis='x', colors='white')
+ax.tick_params(axis='y', colors='white')
 
-ax.set_ylabel(
-    "Predicted Travel Time"
-)
+# Remove borders (spines) for a cleaner "app" look
+for spine in ax.spines.values():
+    spine.set_edgecolor('#00E5FF')
 
 st.pyplot(fig)
 
@@ -178,35 +242,19 @@ merged = route_df.merge(
 )
 
 # -----------------------------------
-# Map
+# Upgraded Interactive Route Map
 # -----------------------------------
 
-st.subheader("🗺️ Optimized Route Map")
+st.subheader("🗺️ Optimized Delivery Route Map")
 
 center_lat = merged["Latitude"].mean()
 center_lon = merged["Longitude"].mean()
 
 m = folium.Map(
     location=[center_lat, center_lon],
-    zoom_start=11
+    zoom_start=11,
+    tiles="CartoDB dark_matter"
 )
-
-# Route markers
-
-for idx, row in merged.iterrows():
-
-    popup_text = (
-        f"Stop {idx+1}<br>"
-        f"{row['Location']}"
-    )
-
-    folium.Marker(
-        [row["Latitude"], row["Longitude"]],
-        popup=popup_text,
-        tooltip=row["Location"]
-    ).add_to(m)
-
-# Route line
 
 route_points = list(
     zip(
@@ -215,16 +263,99 @@ route_points = list(
     )
 )
 
+# Draw optimized route line
 folium.PolyLine(
     route_points,
-    weight=5
+    color="#00E5FF",
+    weight=5,
+    opacity=0.9,
+    tooltip="Optimized Delivery Route"
+).add_to(m)
+
+# Add numbered markers
+for idx, row in merged.iterrows():
+
+    location_name = row["Location"]
+    stop_number = idx + 1
+
+    # Hospital = green
+    if "Central_Hospital" in location_name:
+        marker_color = "#22C55E"
+        icon_symbol = "🏥"
+
+    # Last clinic before returning = red
+    elif idx == len(merged) - 2:
+        marker_color = "#EF4444"
+        icon_symbol = "📦"
+
+    # Normal clinics = blue
+    else:
+        marker_color = "#2563EB"
+        icon_symbol = "📦"
+
+    html_marker = f"""
+    <div style="
+        background-color:{marker_color};
+        color:white;
+        border-radius:50%;
+        width:34px;
+        height:34px;
+        text-align:center;
+        line-height:34px;
+        font-weight:bold;
+        font-size:14px;
+        border:2px solid white;
+        box-shadow:0px 0px 8px rgba(255,255,255,0.6);
+    ">
+        {stop_number}
+    </div>
+    """
+
+    popup_text = f"""
+    <b>Stop {stop_number}</b><br>
+    {icon_symbol} {location_name}
+    """
+
+    folium.Marker(
+        location=[row["Latitude"], row["Longitude"]],
+        popup=popup_text,
+        tooltip=f"Stop {stop_number}: {location_name}",
+        icon=folium.DivIcon(
+            html=html_marker
+        )
+    ).add_to(m)
+
+# Add start/end label
+start_row = merged.iloc[0]
+
+folium.Marker(
+    location=[
+        start_row["Latitude"],
+        start_row["Longitude"]
+    ],
+    popup="🏥 Central Hospital: Start / End Point",
+    tooltip="Central Hospital",
+    icon=folium.Icon(
+        color="green",
+        icon="plus-sign"
+    )
 ).add_to(m)
 
 st_folium(
     m,
     width=1200,
-    height=600
+    height=650
 )
+
+st.markdown("""
+### 🧭 Map Legend
+
+🟢 **Green** = Central Hospital / Start & End Point  
+🔵 **Blue** = Clinic Delivery Stops  
+🔴 **Red** = Final Clinic Before Returning  
+🟦 **Cyan Line** = Optimized Delivery Route
+""")
+
 
 # -----------------------------------
 # Best Route Details
