@@ -208,11 +208,28 @@ col5.metric("🧬 Generations", generation_count)
 # Merge Route with Coordinates
 # -----------------------------------
 
+route_df.columns = route_df.columns.str.strip()
+locations_df.columns = locations_df.columns.str.strip()
+
+route_df["Location"] = route_df["Location"].astype(str).str.strip()
+locations_df["Location"] = locations_df["Location"].astype(str).str.strip()
+
+locations_df["Latitude"] = pd.to_numeric(locations_df["Latitude"], errors="coerce")
+locations_df["Longitude"] = pd.to_numeric(locations_df["Longitude"], errors="coerce")
+
 merged = route_df.merge(
     locations_df,
     on="Location",
     how="left"
 )
+
+missing_locations = merged[merged[["Latitude", "Longitude"]].isna().any(axis=1)]
+
+if not missing_locations.empty:
+    st.error("Map cannot load because some route locations do not have coordinates.")
+    st.dataframe(missing_locations[["Location", "Latitude", "Longitude"]])
+    st.stop()
+
 
 # -----------------------------------
 # Main Dashboard Layout: Map + Recommendation
