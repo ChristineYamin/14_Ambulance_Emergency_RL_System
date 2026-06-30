@@ -223,6 +223,11 @@ left_col, right_col = st.columns([1.6, 1])
 with left_col:
 
     st.subheader("🗺️ Optimized Route Map")
+    missing_locations = merged[merged[["Latitude", "Longitude"]].isna().any(axis=1)]
+    if not missing_locations.empty:
+        st.error("Some route locations are missing latitude/longitude data.")
+        st.dataframe(missing_locations)
+        st.stop()
 
     center_lat = merged["Latitude"].mean()
     center_lon = merged["Longitude"].mean()
@@ -230,9 +235,7 @@ with left_col:
     m = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=11,
-        tiles="OpenStreetMap",
-        width="100%",
-        height="100%"
+        tiles="OpenStreetMap"
     )
 
     route_points = list(
@@ -305,8 +308,9 @@ with left_col:
 
     st_folium(
         m,
-        use_container_width=True,
-        height=530
+        width=850,
+        height=500,
+        key="optimized_route_map"
     )
 
     st.caption(
